@@ -39,6 +39,18 @@ class Recipe(db.Model):
     country = db.Column(db.String(100), index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'ingredients': self.ingredients,
+            'instructions': self.instructions,
+            'people_served': self.people_served,
+            'country': self.country,
+            'user_id': self.user_id,
+            'created_at': self.created_at.isoformat()
+        }
 
 class Rating(db.Model):
     __tablename__ = 'ratings'

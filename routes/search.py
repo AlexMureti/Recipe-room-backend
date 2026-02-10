@@ -45,7 +45,7 @@ def discover_recipes():
         query = query.join(Rating).group_by(Recipe.id).having(func.avg(Rating.value) >= float(rating))
     
     recipes = query.all()
-    return jsonify([{'id': r.id, 'name': r.name, 'country': r.country, 'people_served': r.people_served} for r in recipes]), 200
+    return jsonify([r.to_dict() for r in recipes]), 200
 
 
 @search_bp.route('/recipes/<int:recipe_id>/rate', methods=['POST'])
