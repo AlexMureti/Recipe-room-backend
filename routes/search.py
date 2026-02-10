@@ -5,6 +5,26 @@ from models import db, Recipe, Rating, Bookmark
 
 search_bp = Blueprint('search', __name__)
 
+@search_bp.route('/recipes', methods=['POST'])
+@jwt_required()
+def create_recipe():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    recipe = Recipe(
+        name=data['name'],
+        ingredients=data['ingredients'],
+        instructions=data['instructions'],
+        people_served=data.get('people_served', 1),
+        country=data.get('country'),
+        user_id=user_id
+    )
+    
+    db.session.add(recipe)
+    db.session.commit()
+    
+    return jsonify({'id': recipe.id, 'message': 'Recipe created'}), 201
+
 @search_bp.route('/recipes/discover', methods=['GET'])
 def discover_recipes():
     query = Recipe.query
