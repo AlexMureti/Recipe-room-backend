@@ -11,7 +11,7 @@ class Config:
     
     # CORS Configuration
     # Comma-separated list of allowed origins for production
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
+    CORS_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', '*').split(',')]
     
     # Environment
     ENV = os.environ.get('FLASK_ENV', 'development')
