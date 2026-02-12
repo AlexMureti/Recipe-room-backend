@@ -19,9 +19,15 @@ def create_app():
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
     
-    # Initialize database tables on startup
+    # Initialize database tables on startup (with error handling for production)
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            # Don't crash if database isn't available yet
+            # This can happen during first deploy
+            import sys
+            print(f"Warning: Could not initialize database: {e}", file=sys.stderr)
     
     # Configure CORS with proper origins
     cors_config = {
