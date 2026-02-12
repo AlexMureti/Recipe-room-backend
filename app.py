@@ -269,6 +269,8 @@ def create_app():
     
     return app
 
+# Create app instance for gunicorn to use
+# This is only called when gunicorn imports the module
 app = create_app()
 
 if __name__ == '__main__':

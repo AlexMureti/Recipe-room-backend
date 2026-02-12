@@ -1,0 +1,10 @@
+[build]
+# This tells Railway/Nixpacks how to build the app
+builder = "nixpacks"
+
+# Specify Python version
+[nixpacks]
+packages = ["libpq"]
+
+[start]
+cmd = "gunicorn app:app"
