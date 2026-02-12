@@ -296,6 +296,28 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipes.recipe_id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    comment_text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Relationships
+    comment_user = db.relationship('User', backref=db.backref('user_comments', lazy='dynamic'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'recipe_id': self.recipe_id,
+            'user_id': self.user_id,
+            'comment_text': self.comment_text,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'user': {
+                'user_id': self.comment_user.id,
+                'username': self.comment_user.username,
+                'profile_image': getattr(self.comment_user, 'profile_image', None)
+            } if self.comment_user else None
+        }
 
 class Payment(db.Model):
     __tablename__ = 'payments'
