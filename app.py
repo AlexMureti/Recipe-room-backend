@@ -19,6 +19,10 @@ def create_app():
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
     
+    # Initialize database tables on startup
+    with app.app_context():
+        db.create_all()
+    
     # Configure CORS with proper origins
     cors_config = {
         'origins': app.config['CORS_ORIGINS'],

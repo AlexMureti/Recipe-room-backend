@@ -15,7 +15,7 @@ class Config:
     
     # Environment
     ENV = os.environ.get('FLASK_ENV', 'development')
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     # PayD API Configuration
     PAYD_API_URL = "https://api.payd.money"
