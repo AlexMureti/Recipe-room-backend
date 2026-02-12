@@ -9,7 +9,7 @@ payment_bp = Blueprint('payment', __name__)
 @payment_bp.route('/initiate', methods=['POST'])
 @jwt_required()
 def initiate_payment():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json()
 
     # Validate required fields

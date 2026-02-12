@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import requests
 
-BASE = "http://localhost:5000/api"
+BASE = "http://localhost:8000/api"
 
 # 1. Register user
 print("1. Registering user...")

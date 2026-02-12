@@ -58,7 +58,7 @@ def login():
 @jwt_required()
 def get_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -70,7 +70,7 @@ def get_profile():
 @jwt_required()
 def update_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -98,7 +98,7 @@ def update_profile():
 @jwt_required()
 def upload_profile_image():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404

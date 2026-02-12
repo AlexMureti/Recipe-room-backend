@@ -38,24 +38,6 @@ class User(db.Model):
             'created_at': self.created_at.isoformat()
         }
 
-class Recipe(db.Model):
-    __tablename__ = 'recipes'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False, index=True)
-    ingredients = db.Column(db.Text, nullable=False)
-    instructions = db.Column(db.Text, nullable=False)
-    people_served = db.Column(db.Integer)
-    country = db.Column(db.String(100), index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref='payments')
-
-
-# ============================================================================
-# RECIPE MODELS - Alex Maingi's Recipes CRUD & Group Recipes
-# ============================================================================
-
 # Association table: Recipe <-> RecipeGroup (which recipes belong to which groups)
 recipe_group_members = db.Table('recipe_group_members',
     db.Column('rgm_id', db.Integer, primary_key=True, autoincrement=True),
@@ -178,7 +160,6 @@ class Recipe(db.Model):
         if not ratings:
             return 0.0
         return round(sum(r.rating_value for r in ratings) / len(ratings), 2)
-
 
 class RecipeGroup(db.Model):
     """
@@ -315,3 +296,14 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipes.recipe_id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='KES')
+    status = db.Column(db.String(50), default='pending')
+    payd_transaction_id = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+

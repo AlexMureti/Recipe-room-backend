@@ -10,6 +10,7 @@ Prefix: /api/groups
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import insert, delete
 from datetime import datetime
 
 from models import RecipeGroup, Recipe, User, group_memberships, recipe_group_members
@@ -27,7 +28,7 @@ def get_user_groups():
     Requires authentication.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get user from database
         user = User.query.get(current_user_id)
@@ -64,7 +65,7 @@ def get_group_by_id(group_id):
     User must be a member to view.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -113,7 +114,7 @@ def create_group():
     }
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -183,7 +184,7 @@ def update_group(group_id):
     Only the owner can update group info.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -260,7 +261,7 @@ def delete_group(group_id):
     Only the owner can delete.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -317,7 +318,7 @@ def add_group_member(group_id):
     Expected JSON: {"user_id": 123}
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate input
@@ -405,7 +406,7 @@ def remove_group_member(group_id, user_id):
     Owner can remove anyone, members can remove themselves.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -487,7 +488,7 @@ def get_group_recipes(group_id):
     Must be a group member.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -537,7 +538,7 @@ def add_recipe_to_group(group_id, recipe_id):
     Recipe owner or group members can do this.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -578,8 +579,15 @@ def add_recipe_to_group(group_id, recipe_id):
                 'error': 'Recipe already in group'
             }), 400
         
-        # Add recipe to group
-        group.group_recipes.append(recipe)
+        # Add recipe to group with the user who added it
+        # We need to manually insert into the association table to include rgm_added_by
+        stmt = insert(recipe_group_members).values(
+            rgm_recipe_id=recipe_id,
+            rgm_group_id=group_id,
+            rgm_added_by=current_user_id,
+            rgm_added_at=datetime.utcnow()
+        )
+        db.session.execute(stmt)
         group.group_updated_at = datetime.utcnow()
         db.session.commit()
         
@@ -612,7 +620,7 @@ def remove_recipe_from_group(group_id, recipe_id):
     Recipe owner or group owner can do this.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find group
         group = RecipeGroup.query.filter_by(
@@ -656,8 +664,13 @@ def remove_recipe_from_group(group_id, recipe_id):
                 'error': 'Recipe not in group'
             }), 400
         
-        # Remove recipe from group
-        group.group_recipes.remove(recipe)
+        # Remove recipe from group by deleting from association table
+        stmt = delete(recipe_group_members).where(
+            recipe_group_members.c.rgm_recipe_id == recipe_id
+        ).where(
+            recipe_group_members.c.rgm_group_id == group_id
+        )
+        db.session.execute(stmt)
         group.group_updated_at = datetime.utcnow()
         db.session.commit()
         

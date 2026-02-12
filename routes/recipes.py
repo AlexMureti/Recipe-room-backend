@@ -10,10 +10,11 @@ Prefix: /api/recipes
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func
 from datetime import datetime
 
 # Import models
-from models import Recipe, RecipeGroup, RecipeEditHistory, recipe_group_members, group_memberships
+from models import Recipe, RecipeGroup, RecipeEditHistory, recipe_group_members, group_memberships, Rating, Bookmark
 from database import db
 from utils import validate_recipe_data, upload_image_to_cloudinary, delete_image_from_cloudinary
 #setting up the blueprint
@@ -111,7 +112,7 @@ def create_recipe():
     """
     try:
         # Get current user ID from JWT token
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Get request data
         data = request.get_json()
@@ -196,7 +197,7 @@ def update_recipe(recipe_id):
     User must be the owner or a group member (if it's a group recipe).
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find recipe
         recipe = Recipe.query.filter_by(
@@ -313,7 +314,7 @@ def delete_recipe(recipe_id):
     Only the owner can delete.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Find recipe
         recipe = Recipe.query.filter_by(
@@ -424,7 +425,7 @@ def get_recipe_edit_history(recipe_id):
     Requires authentication.
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Check if recipe exists
         recipe = Recipe.query.filter_by(
@@ -467,5 +468,231 @@ def get_recipe_edit_history(recipe_id):
         return jsonify({
             'success': False,
             'error': 'Failed to retrieve edit history',
+            'message': str(e)
+        }), 200
+
+# Additional endpoints for discover, rating, and bookmarks
+@recipe_bp.route('/discover', methods=['GET'])
+def discover_recipes():
+    """
+    Discover recipes with optional filters.
+    Query params: name, ingredient, people_served, country, rating
+    Public endpoint - no authentication required
+    """
+    try:
+        query = Recipe.query.filter_by(recipe_is_deleted=False)
+        
+        # Filter by name
+        if name := request.args.get('name'):
+            query = query.filter(Recipe.recipe_title.ilike(f'%{name}%'))
+        
+        # Filter by ingredient
+        if ingredient := request.args.get('ingredient'):
+            query = query.filter(Recipe.recipe_ingredients.ilike(f'%{ingredient}%'))
+        
+        # Filter by people served
+        if people := request.args.get('people_served'):
+            query = query.filter(Recipe.recipe_people_served == int(people))
+        
+        # Filter by country
+        if country := request.args.get('country'):
+            query = query.filter(Recipe.recipe_country == country)
+        
+        # Filter by rating
+        if rating := request.args.get('rating'):
+            query = query.join(Rating).group_by(Recipe.recipe_id).having(func.avg(Rating.rating_value) >= float(rating))
+        
+        # Order by newest first
+        recipes = query.order_by(Recipe.recipe_created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'recipes': [recipe.to_dict(include_owner=True, include_stats=True) for recipe in recipes]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to discover recipes',
+            'message': str(e)
+        }), 500
+
+@recipe_bp.route('/<int:recipe_id>/rate', methods=['POST'])
+@jwt_required()
+def rate_recipe(recipe_id):
+    """
+    Rate a recipe (1-5 stars).
+    Requires authentication.
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json()
+        value = data.get('value')
+        
+        # Validate rating value
+        if not value or value not in range(1, 6):
+            return jsonify({
+                'success': False,
+                'error': 'Rating must be between 1 and 5'
+            }), 400
+        
+        # Check if recipe exists
+        recipe = Recipe.query.filter_by(recipe_id=recipe_id, recipe_is_deleted=False).first()
+        if not recipe:
+            return jsonify({
+                'success': False,
+                'error': 'Recipe not found'
+            }), 404
+        
+        # Check if rating exists
+        rating = Rating.query.filter_by(user_id=user_id, recipe_id=recipe_id).first()
+        if rating:
+            rating.rating_value = value
+        else:
+            rating = Rating(user_id=user_id, recipe_id=recipe_id, rating_value=value)
+            db.session.add(rating)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Rating saved successfully'
+        }), 200
+        
+    except SQLAlchemyError as db_error:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Database error',
+            'message': str(db_error)
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to save rating',
+            'message': str(e)
+        }), 500
+
+@recipe_bp.route('/<int:recipe_id>/rating', methods=['GET'])
+def get_recipe_rating(recipe_id):
+    """
+    Get average rating for a recipe.
+    Public endpoint.
+    """
+    try:
+        # Check if recipe exists
+        recipe = Recipe.query.filter_by(recipe_id=recipe_id, recipe_is_deleted=False).first()
+        if not recipe:
+            return jsonify({
+                'success': False,
+                'error': 'Recipe not found'
+            }), 404
+        
+        # Calculate average rating
+        avg = db.session.query(func.avg(Rating.rating_value)).filter(Rating.recipe_id == recipe_id).scalar()
+        count = Rating.query.filter_by(recipe_id=recipe_id).count()
+        
+        return jsonify({
+            'success': True,
+            'average': round(avg or 0, 1),
+            'count': count
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get rating',
+            'message': str(e)
+        }), 500
+
+@recipe_bp.route('/<int:recipe_id>/bookmark', methods=['POST'])
+@jwt_required()
+def bookmark_recipe(recipe_id):
+    """
+    Bookmark a recipe.
+    Requires authentication.
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        
+        # Check if recipe exists
+        recipe = Recipe.query.filter_by(recipe_id=recipe_id, recipe_is_deleted=False).first()
+        if not recipe:
+            return jsonify({
+                'success': False,
+                'error': 'Recipe not found'
+            }), 404
+        
+        # Check if already bookmarked
+        existing = Bookmark.query.filter_by(user_id=user_id, recipe_id=recipe_id).first()
+        if existing:
+            return jsonify({
+                'success': True,
+                'message': 'Recipe already bookmarked'
+            }), 200
+        
+        # Create bookmark
+        bookmark = Bookmark(user_id=user_id, recipe_id=recipe_id)
+        db.session.add(bookmark)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Recipe bookmarked successfully'
+        }), 201
+        
+    except SQLAlchemyError as db_error:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Database error',
+            'message': str(db_error)
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to bookmark recipe',
+            'message': str(e)
+        }), 500
+
+@recipe_bp.route('/<int:recipe_id>/bookmark', methods=['DELETE'])
+@jwt_required()
+def remove_bookmark(recipe_id):
+    """
+    Remove a bookmark from a recipe.
+    Requires authentication.
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        
+        # Delete bookmark
+        deleted = Bookmark.query.filter_by(user_id=user_id, recipe_id=recipe_id).delete()
+        
+        if deleted:
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Bookmark removed successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Bookmark not found'
+            }), 404
+        
+    except SQLAlchemyError as db_error:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Database error',
+            'message': str(db_error)
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to remove bookmark',
             'message': str(e)
         }), 500
