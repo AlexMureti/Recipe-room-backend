@@ -28,6 +28,11 @@ def seed_database():
             {'username': 'sarah_cook', 'email': 'sarah@example.com', 'password': 'password123'},
             {'username': 'mike_baker', 'email': 'mike@example.com', 'password': 'password123'},
             {'username': 'emma_foodie', 'email': 'emma@example.com', 'password': 'password123'},
+            {'username': 'sasha_lisa', 'email': 'sasha@example.com', 'password': 'password123'},
+            {'username': 'joy_kori', 'email': 'joy@example.com', 'password': 'password123'},
+            {'username': 'derrick', 'email': 'derrick@example.com', 'password': 'password123'},
+            {'username': 'ian', 'email': 'ian@example.com', 'password': 'password123'},
+            {'username': 'alex_maingi', 'email': 'alex@example.com', 'password': 'password123'},
         ]
         
         for data in user_data:
