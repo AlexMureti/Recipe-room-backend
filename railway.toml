@@ -1,10 +1,9 @@
 [build]
-# This tells Railway/Nixpacks how to build the app
 builder = "nixpacks"
 
-# Specify Python version
-[nixpacks]
-packages = ["libpq"]
+[build.nixpacks]
+# Install system packages for PostgreSQL
+packages = ["libpq", "gcc", "postgresql"]
 
 [start]
 cmd = "gunicorn app:app"
